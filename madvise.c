@@ -6,8 +6,7 @@
 #include <linux/pid.h>      /* for pid_task and find */
 #include <linux/types.h>    /* for pid_t */
 #include <linux/rcupdate.h> /* for rcu_read_lock */
-
-MODULE_LICENSE("GPL");
+#include <linux/errno.h>
 
 static int __init madvise_swap_init(void)
 {
@@ -16,6 +15,7 @@ static int __init madvise_swap_init(void)
     struct vm_area_struct *vm_area;
     unsigned long vm_start;
     unsigned long vm_end;
+    int ret;
 
     pid = 14799;
 
@@ -25,9 +25,9 @@ static int __init madvise_swap_init(void)
     rcu_read_lock();
     task_to_swap = pid_task(find_vpid(pid), PIDTYPE_PID);
     if (!task_to_swap) {
-        rcu_read_unlock();
         printk (KERN_INFO "No task found!");
-        return 0;
+        ret = -ESRCH;
+        goto task_fail;
     }
 
     spin_lock(&task_to_swap->active_mm->page_table_lock);
@@ -43,15 +43,19 @@ static int __init madvise_swap_init(void)
     }
 
     spin_unlock(&task_to_swap->active_mm->page_table_lock);
-    rcu_read_unlock();
 
-	return 0;
+    task_fail:
+        rcu_read_unlock();
+
+	return ret;
 }
 
 static void __exit madvise_swap_exit(void)
 {
 	printk(KERN_INFO "Goodbye, world 2\n");
 }
+
+MODULE_LICENSE("GPL");
 
 module_init(madvise_swap_init);
 module_exit(madvise_swap_exit);
